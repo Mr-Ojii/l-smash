@@ -1349,6 +1349,20 @@ int hevc_parse_sei
                 lsmash_bits_get( bits, 1 );     /* exact_match_flag */
                 sei->recovery_point.broken_link_flag = lsmash_bits_get( bits, 1 );
             }
+            else if( payloadType == HEVC_SEI_MASTERING_DISPLAY )
+            {
+                /* mastering_display */
+                sei->mastering_display.present = 2; /* so that only one is added */
+                for( size_t j = 0; j < 3; j++ )
+                {
+                    sei->mastering_display.display_primaries_x[j] = lsmash_bits_get( bits, 16 );
+                    sei->mastering_display.display_primaries_y[j] = lsmash_bits_get( bits, 16 );
+                }
+                sei->mastering_display.white_point_x = lsmash_bits_get( bits, 16 );
+                sei->mastering_display.white_point_y = lsmash_bits_get( bits, 16 );
+                sei->mastering_display.max_display_mastering_luminance = lsmash_bits_get( bits, 32 );
+                sei->mastering_display.min_display_mastering_luminance = lsmash_bits_get( bits, 32 );
+            }
             else
                 goto skip_sei_message;
         }
@@ -1829,7 +1843,7 @@ int hevc_find_au_delimit_by_nalu_type
 )
 {
     /* 7.4.2.4.4 Order of NAL units and coded pictures and their association to access units */
-    if( prev_nalu_type <= HEVC_NALU_TYPE_RSV_VCL31 )
+    if( prev_nalu_type <= HEVC_NALU_TYPE_RSV_VCL31 || prev_nalu_type == HEVC_NALU_TYPE_UNSPEC62 )
         /* The first of any of the following NAL units after the last VCL NAL unit of a coded picture
          * specifies the start of a new access unit:
          *   - access unit delimiter NAL unit (when present)
@@ -2749,6 +2763,32 @@ int lsmash_get_hevc_array_completeness
     return 0;
 }
 
+int lsmash_get_hevc_array_sei_presence
+(
+    lsmash_hevc_specific_parameters_t *param,
+    lsmash_hevc_dcr_nalu_type          ps_type,
+    lsmash_hevc_sei_payload_type       payload_type
+)
+{
+    if( hevc_alloc_parameter_arrays_if_needed( param ) < 0 )
+        return LSMASH_ERR_MEMORY_ALLOC;
+    hevc_parameter_array_t *ps_array = hevc_get_parameter_set_array( param, ps_type );
+    if( !ps_array )
+        return LSMASH_ERR_FUNCTION_PARAM;
+
+    if( ps_array->NAL_unit_type != HEVC_NALU_TYPE_PREFIX_SEI )
+        return LSMASH_ERR_FUNCTION_PARAM;
+
+    for( lsmash_entry_t *entry = ps_array->list->head; entry; entry = entry->next )
+    {
+        isom_dcr_ps_entry_t *ps = (isom_dcr_ps_entry_t *)entry->data;
+        if( ps->nalUnitLength > 2 && *(ps->nalUnit + 2) == payload_type )
+            return 0;
+    }
+
+    return LSMASH_ERR_INVALID_DATA;
+}
+
 static int hevc_parse_succeeded
 (
     hevc_info_t                       *info,
@@ -2948,6 +2988,7 @@ int hevc_construct_specific_parameters
         temp8 = lsmash_bs_get_byte( bs );
         param_array.array_completeness = (temp8 >> 7) & 0x01;
         param_array.NAL_unit_type      =  temp8       & 0x3F;
+        lsmash_list_init(param_array.list, isom_remove_dcr_ps);
         param_array.list->entry_count  = lsmash_bs_get_be16( bs );
         if( param_array.NAL_unit_type == HEVC_NALU_TYPE_VPS
          || param_array.NAL_unit_type == HEVC_NALU_TYPE_SPS
@@ -2991,6 +3032,108 @@ int hevc_construct_specific_parameters
 fail:
     lsmash_bs_cleanup( bs );
     return err;
+}
+
+static uint8_t derive_dovi_level
+(
+    uint32_t timescale,
+    uint32_t timebase,
+    uint32_t width,
+    uint32_t height
+)
+{
+    uint64_t pixels_per_second = ((uint64_t)width) * ((uint64_t)height) * ((uint64_t)timescale) / ((uint64_t)timebase);
+
+    if (pixels_per_second < 22118400ULL)
+        return 1;
+    else if (pixels_per_second < 27648000ULL)
+        return 2;
+    else if (pixels_per_second < 49766400ULL)
+        return 3;
+    else if (pixels_per_second < 62208000ULL)
+        return 4;
+    else if (pixels_per_second < 124416000ULL)
+        return 5;
+    else if (pixels_per_second < 199065600ULL)
+        return 6;
+    else if (pixels_per_second < 248832000ULL)
+        return 7;
+    else if (pixels_per_second < 398131200ULL)
+        return 8;
+    else if (pixels_per_second < 497664000ULL)
+        return 9;
+    else if (pixels_per_second < 995328000ULL && width <= 3840)
+        return 10;
+    else if (pixels_per_second < 995328000ULL)
+        return 11;
+    else if (pixels_per_second < 1990656000ULL)
+        return 12;
+    else if (pixels_per_second < 3981312000ULL)
+        return 13;
+    return 0;
+}
+
+void lsmash_dovi_set_config
+(
+    lsmash_hevc_dovi_t *data,
+    uint8_t dv_profile,
+    uint8_t dv_bl_signal_compatibility_id,
+    uint32_t timescale,
+    uint32_t timebase,
+    uint32_t width,
+    uint32_t height
+)
+{
+    data->dv_version_major              = 1;
+    data->dv_version_minor              = 0;
+    data->dv_profile                    = dv_profile;
+    data->dv_bl_signal_compatibility_id = dv_bl_signal_compatibility_id;
+    data->reserved1                     = 0;
+    data->reserved2[0]                  = 0;
+    data->reserved2[1]                  = 0;
+    data->reserved2[2]                  = 0;
+    data->reserved2[3]                  = 0;
+
+    /* In all singe track cases these are set to one. */
+    data->rpu_present_flag = 1;
+    data->bl_present_flag  = 1;
+
+    data->el_present_flag = dv_profile == 4 || dv_profile == 7;
+
+    data->dv_level = derive_dovi_level(timescale, timebase, width, height);
+}
+
+int hevc_print_dovi
+(
+    FILE          *fp,
+    lsmash_file_t *file,
+    isom_box_t    *box,
+    int            level
+)
+{
+    assert( fp && LSMASH_IS_EXISTING_BOX( file ) && LSMASH_IS_EXISTING_BOX( box ) );
+    int indent = level;
+    lsmash_ifprintf( fp, indent++, "[%s: Dolby Vision configuration box]\n", isom_4cc2str( box->type.fourcc ) );
+    lsmash_ifprintf( fp, indent, "position = %"PRIu64"\n", box->pos );
+    lsmash_ifprintf( fp, indent, "size = %"PRIu64"\n", box->size );
+
+    isom_dovi_t *dovi = (isom_dovi_t *)box;
+    lsmash_ifprintf( fp, indent, "dv_version_major = %"PRIu8"\n",              dovi->dv_version_major );
+    lsmash_ifprintf( fp, indent, "dv_version_minor = %"PRIu8"\n",              dovi->dv_version_minor );
+    lsmash_ifprintf( fp, indent, "dv_profile = %"PRIu8"\n",                    dovi->dv_profile );
+    lsmash_ifprintf( fp, indent, "dv_level = %"PRIu8"\n",                      dovi->dv_level );
+    lsmash_ifprintf( fp, indent, "rpu_present_flag = %"PRIu8"\n",              dovi->rpu_present_flag );
+    lsmash_ifprintf( fp, indent, "el_present_flag = %"PRIu8"\n",               dovi->el_present_flag );
+    lsmash_ifprintf( fp, indent, "bl_present_flag = %"PRIu8"\n",               dovi->bl_present_flag );
+    lsmash_ifprintf( fp, indent, "dv_bl_signal_compatibility_id = %"PRIu8"\n", dovi->dv_bl_signal_compatibility_id );
+    lsmash_ifprintf( fp, indent, "reserved = 0x%07"PRIx32"\n",                 dovi->reserved1 );
+    lsmash_ifprintf( fp, indent++, "reserved = \n");
+    lsmash_ifprintf( fp, indent, "0x%08"PRIx32"\n", dovi->reserved2[0] );
+    lsmash_ifprintf( fp, indent, "0x%08"PRIx32"\n", dovi->reserved2[1] );
+    lsmash_ifprintf( fp, indent, "0x%08"PRIx32"\n", dovi->reserved2[2] );
+    lsmash_ifprintf( fp, indent, "0x%08"PRIx32"\n", dovi->reserved2[3] );
+
+    return 0;
 }
 
 int hevc_print_codec_specific
@@ -3079,9 +3222,17 @@ int hevc_print_codec_specific
         for( uint16_t j = 0; j < numNalus; j++ )
         {
             uint16_t nalUnitLength = lsmash_bs_get_be16( bs );
-            lsmash_bs_skip_bytes( bs, nalUnitLength );
             lsmash_ifprintf( fp, array_indent, "nalUnit[%"PRIu16"]\n", j );
             lsmash_ifprintf( fp, array_indent + 1, "nalUnitLength = %"PRIu16"\n", nalUnitLength );
+
+            if( (temp8 & 0x3F) == HEVC_NALU_TYPE_PREFIX_SEI )
+            {
+                lsmash_bs_skip_bytes( bs, 2 );
+                lsmash_ifprintf(fp, array_indent + 1, "seiPayloadType = %"PRIu8"\n", lsmash_bs_get_byte( bs ));
+                lsmash_bs_skip_bytes( bs, nalUnitLength - 3 );
+            }
+            else
+                lsmash_bs_skip_bytes( bs, nalUnitLength );
         }
     }
     lsmash_bs_cleanup( bs );

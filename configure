@@ -116,7 +116,7 @@ TOOLS=""
 CFLAGS="-Wshadow -Wall -std=c99 -pedantic -I. -I$SRCDIR"
 LDFLAGS="-L."
 SO_LDFLAGS='-shared -Wl,-soname,$@ -Wl,--version-script,liblsmash.ver'
-LIBS="-lm"
+LIBS="-lm -lobuparse"
 
 for opt; do
     optarg="${opt#*=}"
@@ -191,7 +191,7 @@ LD="${CROSS}${LD}"
 RANLIB="${CROSS}${RANLIB}"
 STRIP="${CROSS}${STRIP}"
 for f in "$CC" "$AR" "$LD" "$RANLIB" "$STRIP"; do
-    test -n "$(which $f 2> /dev/null)" || error_exit "$f is not executable"
+    test -n "$(command -v "$f" 2> /dev/null)" || error_exit "$f is not executable"
 done
 
 
@@ -314,6 +314,8 @@ SRC_COMMON="   \
 SRC_CODECS="      \
     a52.c         \
     alac.c        \
+    av1.c         \
+    av1_obu.c     \
     description.c \
     dts.c         \
     h264.c        \
@@ -323,6 +325,7 @@ SRC_CODECS="      \
     mp4a.c        \
     mp4v.c        \
     nalu.c        \
+    opus.c        \
     qt_wfex.c     \
     vc1.c         \
     wma.c"
@@ -335,6 +338,7 @@ SRC_IMPORTER="  \
     dts_imp.c   \
     importer.c  \
     isobm_imp.c \
+    ivf_imp.c   \
     mp3_imp.c   \
     nalu_imp.c  \
     vc1_imp.c   \

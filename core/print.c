@@ -783,6 +783,88 @@ static int isom_print_stbl( FILE *fp, lsmash_file_t *file, isom_box_t *box, int 
     return isom_print_simple( fp, box, level, "Sample Table Box" );
 }
 
+static int isom_print_SA3D( FILE *fp, lsmash_file_t *file, isom_box_t *box, int level )
+{
+    isom_SA3D_t *SA3D = (isom_SA3D_t *)box;
+    int indent = level;
+    int i = 0;
+    isom_print_box_common( fp, indent++, box, "Spatial Audio Box" );
+    lsmash_ifprintf( fp, indent, "version = %"PRIu8"\n", SA3D->version );
+    lsmash_ifprintf( fp, indent, "head_locked_stereo = %"PRIu8"\n", SA3D->head_locked_stereo );
+    lsmash_ifprintf( fp, indent, "ambisonic_type = %"PRIu8"\n", SA3D->ambisonic_type );
+    lsmash_ifprintf( fp, indent, "ambisonic_order = %"PRIu32"\n", SA3D->ambisonic_order );
+    lsmash_ifprintf( fp, indent, "ambisonic_channel_ordering = %"PRIu8"\n", SA3D->ambisonic_channel_ordering );
+    lsmash_ifprintf( fp, indent, "ambisonic_normalization = %"PRIu8"\n", SA3D->ambisonic_normalization );
+    lsmash_ifprintf( fp, indent, "num_channels = %"PRIu32"\n", SA3D->num_channels );
+    for( lsmash_entry_t *entry = SA3D->channel_map.head; entry; entry = entry->next )
+    {
+        uint32_t *data = (uint32_t *)entry->data;
+        lsmash_ifprintf( fp, indent, "channel_map[%"PRIu32"] = %"PRIu32"\n", i++, *data );
+    }
+    return 0;
+}
+
+static int isom_print_st3d( FILE *fp, lsmash_file_t *file, isom_box_t *box, int level )
+{
+    isom_st3d_t *st3d = (isom_st3d_t *)box;
+    int indent = level;
+    isom_print_box_common( fp, indent++, box, "Stereoscopic 3D Video Box" );
+    lsmash_ifprintf( fp, indent, "stereo_mode = %"PRIu8"\n", st3d->stereo_mode );
+    return 0;
+}
+
+static int isom_print_sv3d( FILE *fp, lsmash_file_t *file, isom_box_t *box, int level )
+{
+    return isom_print_simple( fp, box, level, "Spherical Video Box" );
+}
+
+static int isom_print_svhd( FILE *fp, lsmash_file_t *file, isom_box_t *box, int level )
+{
+    isom_svhd_t *svhd = (isom_svhd_t *)box;
+    int indent = level;
+    isom_print_box_common( fp, indent++, box, "Spherical Video Header" );
+    lsmash_ifprintf( fp, indent, "metadata_source = %s\n", svhd->metadata_source );
+    return 0;
+}
+
+static int isom_print_proj( FILE *fp, lsmash_file_t *file, isom_box_t *box, int level )
+{
+    return isom_print_simple( fp, box, level, "Projection Box" );
+}
+
+static int isom_print_prhd( FILE *fp, lsmash_file_t *file, isom_box_t *box, int level )
+{
+    isom_prhd_t *prhd = (isom_prhd_t *)box;
+    int indent = level;
+    isom_print_box_common( fp, indent++, box, "Projection Header Box" );
+    lsmash_ifprintf( fp, indent, "pose_yaw_degrees = %f\n", lsmash_fixed2double( prhd->pose_yaw_degrees, 16 ));
+    lsmash_ifprintf( fp, indent, "pose_pitch_degrees = %f\n", lsmash_fixed2double( prhd->pose_pitch_degrees , 16 ));
+    lsmash_ifprintf( fp, indent, "pose_roll_degrees = %f\n", lsmash_fixed2double( prhd->pose_roll_degrees, 16 ));
+    return 0;
+}
+
+static int isom_print_equi( FILE *fp, lsmash_file_t *file, isom_box_t *box, int level )
+{
+    isom_equi_t *equi = (isom_equi_t *)box;
+    int indent = level;
+    isom_print_box_common( fp, indent++, box, "Equirectangular Projection Box" );
+    lsmash_ifprintf( fp, indent, "projection_bounds_top = %"PRIu32"\n", equi->projection_bounds_top );
+    lsmash_ifprintf( fp, indent, "projection_bounds_bottom = %"PRIu32"\n", equi->projection_bounds_bottom );
+    lsmash_ifprintf( fp, indent, "projection_bounds_left = %"PRIu32"\n", equi->projection_bounds_left );
+    lsmash_ifprintf( fp, indent, "projection_bounds_right = %"PRIu32"\n", equi->projection_bounds_right );
+    return 0;
+}
+
+static int isom_print_cbmp( FILE *fp, lsmash_file_t *file, isom_box_t *box, int level )
+{
+    isom_cbmp_t *cbmp = (isom_cbmp_t *)box;
+    int indent = level;
+    isom_print_box_common( fp, indent++, box, "Cubemap Projection Box" );
+    lsmash_ifprintf( fp, indent, "layout = %"PRIu32"\n", cbmp->layout );
+    lsmash_ifprintf( fp, indent, "padding = %"PRIu32"\n", cbmp->padding );
+    return 0;
+}
+
 static int isom_print_stsd( FILE *fp, lsmash_file_t *file, isom_box_t *box, int level )
 {
     isom_stsd_t *stsd = (isom_stsd_t *)box;
@@ -1319,18 +1401,21 @@ static int isom_print_sample_description_extesion( FILE *fp, lsmash_file_t *file
     extern int mp4sys_print_codec_specific( FILE *, lsmash_file_t *, isom_box_t *, int );
     extern int h264_print_codec_specific( FILE *, lsmash_file_t *, isom_box_t *, int );
     extern int hevc_print_codec_specific( FILE *, lsmash_file_t *, isom_box_t *, int );
+    extern int hevc_print_dovi( FILE *, lsmash_file_t *, isom_box_t *, int );
     extern int h264_print_bitrate( FILE *, lsmash_file_t *, isom_box_t *, int );
     extern int vc1_print_codec_specific( FILE *, lsmash_file_t *, isom_box_t *, int );
+    extern int av1_print_codec_specific( FILE *, lsmash_file_t *, isom_box_t *, int );
     extern int ac3_print_codec_specific( FILE *, lsmash_file_t *, isom_box_t *, int );
     extern int eac3_print_codec_specific( FILE *, lsmash_file_t *, isom_box_t *, int );
     extern int dts_print_codec_specific( FILE *, lsmash_file_t *, isom_box_t *, int );
+    extern int opus_print_codec_specific( FILE *, lsmash_file_t *, isom_box_t *, int );
     extern int alac_print_codec_specific( FILE *, lsmash_file_t *, isom_box_t *, int );
     extern int wma_print_codec_specific( FILE *, lsmash_file_t *, isom_box_t *, int );
     static struct print_description_extension_table_tag
     {
         lsmash_box_type_t type;
         int (*print_func)( FILE *, lsmash_file_t *, isom_box_t *, int );
-    } print_description_extension_table[32] = { { LSMASH_BOX_TYPE_INITIALIZER, NULL } };
+    } print_description_extension_table[64] = { { LSMASH_BOX_TYPE_INITIALIZER, NULL } };
     if( !print_description_extension_table[0].print_func )
     {
         /* Initialize the table. */
@@ -1353,15 +1438,27 @@ static int isom_print_sample_description_extesion( FILE *fp, lsmash_file_t *file
         ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT(   QT_BOX_TYPE_WAVE, isom_print_wave );
         ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT(   QT_BOX_TYPE_CHAN, isom_print_chan );
         ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT( ISOM_BOX_TYPE_ESDS, mp4sys_print_codec_specific );
+        ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT( ISOM_BOX_TYPE_AV1C, av1_print_codec_specific );
         ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT( ISOM_BOX_TYPE_AVCC, h264_print_codec_specific );
         ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT( ISOM_BOX_TYPE_BTRT, h264_print_bitrate );
+        ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT( ISOM_BOX_TYPE_DVCC, hevc_print_dovi );
+        ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT( ISOM_BOX_TYPE_DVVC, hevc_print_dovi );
         ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT( ISOM_BOX_TYPE_HVCC, hevc_print_codec_specific );
         ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT( ISOM_BOX_TYPE_DVC1, vc1_print_codec_specific );
         ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT( ISOM_BOX_TYPE_DAC3, ac3_print_codec_specific );
         ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT( ISOM_BOX_TYPE_DEC3, eac3_print_codec_specific );
         ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT( ISOM_BOX_TYPE_DDTS, dts_print_codec_specific );
+        ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT( ISOM_BOX_TYPE_DOPS, opus_print_codec_specific );
         ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT( ISOM_BOX_TYPE_ALAC, alac_print_codec_specific );
         ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT( ISOM_BOX_TYPE_WFEX, wma_print_codec_specific );
+        ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT( ISOM_BOX_TYPE_SA3D, isom_print_SA3D );
+        ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT( ISOM_BOX_TYPE_ST3D, isom_print_st3d );
+        ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT( ISOM_BOX_TYPE_SV3D, isom_print_sv3d );
+        ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT( ISOM_BOX_TYPE_SVHD, isom_print_svhd );
+        ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT( ISOM_BOX_TYPE_PROJ, isom_print_proj );
+        ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT( ISOM_BOX_TYPE_PRHD, isom_print_prhd );
+        ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT( ISOM_BOX_TYPE_EQUI, isom_print_equi );
+        ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT( ISOM_BOX_TYPE_CBMP, isom_print_cbmp );
         ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT( ISOM_BOX_TYPE_FTAB, isom_print_ftab );
         ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT(   QT_BOX_TYPE_ESDS, mp4sys_print_codec_specific );
         ADD_PRINT_DESCRIPTION_EXTENSION_TABLE_ELEMENT(   QT_BOX_TYPE_ALAC, alac_print_codec_specific );
@@ -2505,7 +2602,7 @@ static isom_print_box_t isom_select_print_func( isom_box_t *box )
         ADD_PRINT_BOX_TABLE_ELEMENT(   QT_BOX_TYPE_TEXT, isom_print_text );
         ADD_PRINT_BOX_TABLE_ELEMENT( ISOM_BOX_TYPE_DINF, isom_print_dinf );
         ADD_PRINT_BOX_TABLE_ELEMENT( ISOM_BOX_TYPE_DREF, isom_print_dref );
-        ADD_PRINT_BOX_TABLE_ELEMENT( ISOM_BOX_TYPE_URL,  isom_print_url );
+        ADD_PRINT_BOX_TABLE_ELEMENT( ISOM_BOX_TYPE_URL,  isom_print_url  );
         ADD_PRINT_BOX_TABLE_ELEMENT( ISOM_BOX_TYPE_STBL, isom_print_stbl );
         ADD_PRINT_BOX_TABLE_ELEMENT( ISOM_BOX_TYPE_STSD, isom_print_stsd );
         ADD_PRINT_BOX_TABLE_ELEMENT( ISOM_BOX_TYPE_CLAP, isom_print_clap );
@@ -2563,6 +2660,11 @@ static isom_print_box_t isom_select_print_func( isom_box_t *box )
         ADD_PRINT_BOX_TABLE_ELEMENT( ISOM_BOX_TYPE_MFRA, isom_print_mfra );
         ADD_PRINT_BOX_TABLE_ELEMENT( ISOM_BOX_TYPE_TFRA, isom_print_tfra );
         ADD_PRINT_BOX_TABLE_ELEMENT( ISOM_BOX_TYPE_MFRO, isom_print_mfro );
+        ADD_PRINT_BOX_TABLE_ELEMENT( ISOM_BOX_TYPE_SVHD, isom_print_svhd );
+        ADD_PRINT_BOX_TABLE_ELEMENT( ISOM_BOX_TYPE_PROJ, isom_print_proj );
+        ADD_PRINT_BOX_TABLE_ELEMENT( ISOM_BOX_TYPE_PRHD, isom_print_prhd );
+        ADD_PRINT_BOX_TABLE_ELEMENT( ISOM_BOX_TYPE_EQUI, isom_print_equi );
+        ADD_PRINT_BOX_TABLE_ELEMENT( ISOM_BOX_TYPE_CBMP, isom_print_cbmp );
         ADD_PRINT_BOX_TABLE_ELEMENT( LSMASH_BOX_TYPE_UNSPECIFIED, NULL );
 #undef ADD_PRINT_BOX_TABLE_ELEMENT
     }

@@ -56,6 +56,7 @@ enum
     HEVC_NALU_TYPE_RSV_NVCL47     = 47,
     HEVC_NALU_TYPE_UNSPEC48       = 48,
     HEVC_NALU_TYPE_UNSPEC55       = 55,
+    HEVC_NALU_TYPE_UNSPEC62       = 62,
     HEVC_NALU_TYPE_UNSPEC63       = 63,
     HEVC_NALU_TYPE_UNKNOWN        = 64
 };
@@ -227,8 +228,20 @@ typedef struct
 
 typedef struct
 {
+    uint8_t present;
+    uint16_t display_primaries_x[3];
+    uint16_t display_primaries_y[3];
+    uint16_t white_point_x;
+    uint16_t white_point_y;
+    uint32_t max_display_mastering_luminance;
+    uint32_t min_display_mastering_luminance;
+} hevc_mastering_display_t;
+
+typedef struct
+{
     hevc_pic_timing_t     pic_timing;
     hevc_recovery_point_t recovery_point;
+    hevc_mastering_display_t mastering_display;
 } hevc_sei_t;
 
 /* Slice segment */

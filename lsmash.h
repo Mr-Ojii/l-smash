@@ -47,8 +47,8 @@ extern "C" {
  * Version
  ****************************************************************************/
 #define LSMASH_VERSION_MAJOR  2
-#define LSMASH_VERSION_MINOR 16
-#define LSMASH_VERSION_MICRO  1
+#define LSMASH_VERSION_MINOR 20
+#define LSMASH_VERSION_MICRO  0
 
 #define LSMASH_VERSION_INT( a, b, c ) (((a) << 16) | ((b) << 8) | (c))
 
@@ -142,7 +142,9 @@ typedef enum
     ISOM_BRAND_TYPE_M4V   = LSMASH_4CC( 'M', '4', 'V', ' ' ),   /* MPEG-4 protected audio+video */
     ISOM_BRAND_TYPE_MFSM  = LSMASH_4CC( 'M', 'F', 'S', 'M' ),   /* Media File for Samsung video Metadata */
     ISOM_BRAND_TYPE_MPPI  = LSMASH_4CC( 'M', 'P', 'P', 'I' ),   /* Photo Player Multimedia Application Format */
+    ISOM_BRAND_TYPE_OPUS  = LSMASH_4CC( 'O', 'p', 'u', 's' ),   /* Opus */
     ISOM_BRAND_TYPE_ROSS  = LSMASH_4CC( 'R', 'O', 'S', 'S' ),   /* Ross Video */
+    ISOM_BRAND_TYPE_AV01  = LSMASH_4CC( 'a', 'v', '0', '1' ),   /* AV1 */
     ISOM_BRAND_TYPE_AVC1  = LSMASH_4CC( 'a', 'v', 'c', '1' ),   /* Advanced Video Coding extensions */
     ISOM_BRAND_TYPE_BBXM  = LSMASH_4CC( 'b', 'b', 'x', 'm' ),   /* Blinkbox Master File */
     ISOM_BRAND_TYPE_CAQV  = LSMASH_4CC( 'c', 'a', 'q', 'v' ),   /* Casio Digital Camera */
@@ -703,6 +705,7 @@ DEFINE_ISOM_CODEC_TYPE( ISOM_CODEC_TYPE_G726_AUDIO,  LSMASH_4CC( 'g', '7', '2', 
 DEFINE_ISOM_CODEC_TYPE( ISOM_CODEC_TYPE_M4AE_AUDIO,  LSMASH_4CC( 'm', '4', 'a', 'e' ) );    /* MPEG-4 Audio Enhancement */
 DEFINE_ISOM_CODEC_TYPE( ISOM_CODEC_TYPE_MLPA_AUDIO,  LSMASH_4CC( 'm', 'l', 'p', 'a' ) );    /* MLP Audio */
 DEFINE_ISOM_CODEC_TYPE( ISOM_CODEC_TYPE_MP4A_AUDIO,  LSMASH_4CC( 'm', 'p', '4', 'a' ) );    /* MPEG-4 Audio */
+DEFINE_ISOM_CODEC_TYPE( ISOM_CODEC_TYPE_OPUS_AUDIO,  LSMASH_4CC( 'O', 'p', 'u', 's' ) );    /* Opus */
 DEFINE_ISOM_CODEC_TYPE( ISOM_CODEC_TYPE_RAW_AUDIO,   LSMASH_4CC( 'r', 'a', 'w', ' ' ) );    /* Uncompressed audio */
 DEFINE_ISOM_CODEC_TYPE( ISOM_CODEC_TYPE_SAMR_AUDIO,  LSMASH_4CC( 's', 'a', 'm', 'r' ) );    /* Narrowband AMR voice */
 DEFINE_ISOM_CODEC_TYPE( ISOM_CODEC_TYPE_SAWB_AUDIO,  LSMASH_4CC( 's', 'a', 'w', 'b' ) );    /* Wideband AMR voice */
@@ -748,6 +751,7 @@ DEFINE_QTFF_CODEC_TYPE( QT_CODEC_TYPE_GSM49_AUDIO,   0x6D730031 );              
 DEFINE_QTFF_CODEC_TYPE( QT_CODEC_TYPE_NOT_SPECIFIED, 0x00000000 );                          /* either 'raw ' or 'twos' */
 
 /* Video CODEC identifiers */
+DEFINE_ISOM_CODEC_TYPE( ISOM_CODEC_TYPE_AV01_VIDEO,  LSMASH_4CC( 'a', 'v', '0', '1' ) );    /* AV1 */
 DEFINE_ISOM_CODEC_TYPE( ISOM_CODEC_TYPE_AVC1_VIDEO,  LSMASH_4CC( 'a', 'v', 'c', '1' ) );    /* Advanced Video Coding
                                                                                              *   Any sample must not contain any paramerter set and filler data. */
 DEFINE_ISOM_CODEC_TYPE( ISOM_CODEC_TYPE_AVC2_VIDEO,  LSMASH_4CC( 'a', 'v', 'c', '2' ) );    /* Advanced Video Coding
@@ -775,6 +779,8 @@ DEFINE_ISOM_CODEC_TYPE( ISOM_CODEC_TYPE_MVC2_VIDEO,  LSMASH_4CC( 'm', 'v', 'c', 
 DEFINE_ISOM_CODEC_TYPE( ISOM_CODEC_TYPE_S263_VIDEO,  LSMASH_4CC( 's', '2', '6', '3' ) );    /* ITU H.263 video (3GPP format) */
 DEFINE_ISOM_CODEC_TYPE( ISOM_CODEC_TYPE_SVC1_VIDEO,  LSMASH_4CC( 's', 'v', 'c', '1' ) );    /* Scalable Video Coding */
 DEFINE_ISOM_CODEC_TYPE( ISOM_CODEC_TYPE_VC_1_VIDEO,  LSMASH_4CC( 'v', 'c', '-', '1' ) );    /* SMPTE VC-1 */
+DEFINE_ISOM_CODEC_TYPE( ISOM_CODEC_TYPE_VP08_VIDEO,  LSMASH_4CC( 'v', 'p', '0', '8' ) );    /* VP8 video */
+DEFINE_ISOM_CODEC_TYPE( ISOM_CODEC_TYPE_VP09_VIDEO,  LSMASH_4CC( 'v', 'p', '0', '9' ) );    /* VP9 video */
 
 DEFINE_QTFF_CODEC_TYPE( QT_CODEC_TYPE_2VUY_VIDEO,    LSMASH_4CC( '2', 'v', 'u', 'y' ) );    /* Uncompressed Y'CbCr, 8-bit-per-component 4:2:2
                                                                                              *      |Cb(8)|Y'0(8)|Cr(8)|Y'1(8)| */
@@ -919,10 +925,18 @@ typedef enum
     LSMASH_CODEC_SPECIFIC_DATA_TYPE_ISOM_VIDEO_H264,
     LSMASH_CODEC_SPECIFIC_DATA_TYPE_ISOM_VIDEO_HEVC,
     LSMASH_CODEC_SPECIFIC_DATA_TYPE_ISOM_VIDEO_VC_1,
+    LSMASH_CODEC_SPECIFIC_DATA_TYPE_ISOM_VIDEO_AV1,
     LSMASH_CODEC_SPECIFIC_DATA_TYPE_ISOM_AUDIO_AC_3,
     LSMASH_CODEC_SPECIFIC_DATA_TYPE_ISOM_AUDIO_EC_3,
     LSMASH_CODEC_SPECIFIC_DATA_TYPE_ISOM_AUDIO_DTS,
     LSMASH_CODEC_SPECIFIC_DATA_TYPE_ISOM_AUDIO_ALAC,
+    LSMASH_CODEC_SPECIFIC_DATA_TYPE_ISOM_AUDIO_SA3D,
+    LSMASH_CODEC_SPECIFIC_DATA_TYPE_ISOM_VIDEO_ST3D,
+    LSMASH_CODEC_SPECIFIC_DATA_TYPE_ISOM_VIDEO_PRHD,
+    LSMASH_CODEC_SPECIFIC_DATA_TYPE_ISOM_VIDEO_EQUI,
+    LSMASH_CODEC_SPECIFIC_DATA_TYPE_ISOM_VIDEO_CBMP,
+
+    LSMASH_CODEC_SPECIFIC_DATA_TYPE_ISOM_VIDEO_HEVC_DOVI,
 
     LSMASH_CODEC_SPECIFIC_DATA_TYPE_ISOM_VIDEO_SAMPLE_SCALE,
     LSMASH_CODEC_SPECIFIC_DATA_TYPE_ISOM_VIDEO_H264_BITRATE,
@@ -942,6 +956,9 @@ typedef enum
     LSMASH_CODEC_SPECIFIC_DATA_TYPE_QT_AUDIO_CHANNEL_LAYOUT,
 
     LSMASH_CODEC_SPECIFIC_DATA_TYPE_CODEC_GLOBAL_HEADER,
+
+    /* Added at the end because of the backward compatibility. */
+    LSMASH_CODEC_SPECIFIC_DATA_TYPE_ISOM_AUDIO_OPUS,
 } lsmash_codec_specific_data_type;
 
 typedef enum
@@ -1175,6 +1192,83 @@ typedef enum
     MP4A_AAC_SBR_BACKWARD_COMPATIBLE,   /* explicitly signals SBR present. Recommended method to signal SBR. */
     MP4A_AAC_SBR_HIERARCHICAL           /* SBR exists. SBR dedicated method. */
 } lsmash_mp4a_aac_sbr_mode;
+
+/****************************************************************************
+ * Stereoscopic 3D Video (st3d) definitions. See Spatial Video RFC v2:
+ * https://github.com/google/spatial-media/blob/master/docs/spherical-video-v2-rfc.md
+ ****************************************************************************/
+typedef enum
+{
+    ST3D_STEREO_MODE_MONOSCOPIC = 0,
+    ST3D_STEREO_MODE_TOP_BOTTOM = 1,
+    ST3D_STEREO_MODE_LEFT_RIGHT = 2,
+    ST3D_STEREO_MODE_CUSTOM     = 3,
+    ST3D_STEREO_MODE_RIGHT_LEFT = 4,
+} lsmash_st3d_StereoMode;
+
+typedef struct
+{
+    lsmash_st3d_StereoMode stereo_mode;
+} lsmash_st3d_t;
+
+/****************************************************************************
+ * Spherical Video Boxes definitions. See Spatial Video RFC v2:
+ * https://github.com/google/spatial-media/blob/master/docs/spherical-video-v2-rfc.md
+ ****************************************************************************/
+
+typedef struct
+{
+    int32_t yaw;
+    int32_t pitch;
+    int32_t roll;
+} lsmash_prhd_t;
+
+typedef struct
+{
+    uint32_t top;
+    uint32_t bottom;
+    uint32_t left;
+    uint32_t right;
+} lsmash_equi_t;
+
+typedef struct
+{
+    uint32_t layout;
+    uint32_t padding;
+} lsmash_cbmp_t;
+
+/****************************************************************************
+ * Spatial Audio (SA3D) definitions. See Spatial Audio RFC:
+ * https://github.com/google/spatial-media/blob/master/docs/spatial-audio-rfc.md
+ ****************************************************************************/
+typedef enum
+{
+    SA3D_AMBISONIC_TYPE_PERIPHONIC = 0
+} lsmash_SA3D_AmbisonicType;
+
+typedef enum
+{
+    SA3D_AMBISONIC_CHANNEL_ORDERING_ACN = 0
+} lsmash_SA3D_AmbisonicChannelOrdering;
+
+typedef enum
+{
+    SA3D_AMBISONIC_NORMALIZATION_SN3D = 0
+} lsmash_SA3D_AmbisonicNormalization;
+
+typedef struct
+{
+    uint8_t version; /* Only version 0 is currently supported. */
+    lsmash_boolean_t head_locked_stereo;
+    lsmash_SA3D_AmbisonicType ambisonic_type;
+    uint32_t ambisonic_order;
+    lsmash_SA3D_AmbisonicChannelOrdering ambisonic_channel_ordering;
+    lsmash_SA3D_AmbisonicNormalization ambisonic_normalization;
+    uint32_t num_channels;
+    uint32_t channel_map[256]; /* While technically up to 0xFFFFFFFF channels can be mapped,
+                                * 256 is sufficient to encode up to 15th order ambisonics,
+                                * which is far more than needed for practical uses. */
+} lsmash_SA3D_t;
 
 typedef struct
 {
@@ -3044,6 +3138,46 @@ uint8_t *lsmash_create_alac_specific_info
     uint32_t                          *data_length
 );
 
+/* Opus Audio Specific Information
+ *   Mandatory :
+ *     ISOM_CODEC_TYPE_OPUS_AUDIO */
+typedef struct
+{
+    uint8_t  Version;               /* Only version = 0 is supported. */
+    uint8_t  OutputChannelCount;    /* the number of output channels */
+    uint16_t PreSkip;               /* the number of the priming samples */
+    uint32_t InputSampleRate;       /* the sampling rate of the original input stream
+                                     * If InputSampleRate is set to 0, it indicates 'unspecified'. */
+    int16_t  OutputGain;            /* a gain to be applied by the decoder as fixed point 8.8 number
+                                     *   sample *= pow( 10, OutputGain / 20.0 ) */
+    uint8_t  ChannelMappingFamily;  /* the order and semantic meaning of the output channels
+                                     *   0: allowed OutputChannelCount is 1 or 2.
+                                     *     1 -> monophonic (mono),
+                                     *     2 -> stereo (left, right)
+                                     *   1: allowed OutputChannelCount is from 1 to 8.
+                                     *     1 -> monophonic (mono),
+                                     *     2 -> stereo (left, right)
+                                     *     3 -> linear surround (left, center, right)
+                                     *     4 -> quadraphonic (front left, front right, rear left, rear right)
+                                     *     5 -> 5.0 surround (front left, front center, front right, rear left, rear right)
+                                     *     6 -> 5.1 surround (front left, front center, front right, rear left, rear right, LFE)
+                                     *     7 -> 6.1 surround (front left, front center, front right, side left, side right, rear center, LFE)
+                                     *     8 -> 7.1 surround (front left, front center, front right, side left, side right, rear left, rear right, LFE) */
+    /* If ChannelMappingFamily is not set to 0, the following fields are coded.  */
+    uint8_t  StreamCount;           /* the total number of streams in each Opus sample
+                                     * If ChannelMappingFamily is set to 0, the value defaults to 1. */
+    uint8_t  CoupledCount;          /* the number of streams whose decoders should be configured to produce two channels
+                                     * If ChannelMappingFamily is set to 0, the value defaults to OutputChannelCount - 1. */
+    uint8_t  ChannelMapping[255];   /* one octet per output, indicating which decoded channel should be used for each one
+                                     * If ChannelMappingFamily is set to 0, the first index defaults to 0, and if OutputChannelCount == 2, the second index defaults to 1. */
+} lsmash_opus_specific_parameters_t;
+
+uint8_t *lsmash_create_opus_specific_info
+(
+    lsmash_opus_specific_parameters_t *param,
+    uint32_t                          *data_length
+);
+
 /* MPEG-4 Bitrate Information.
  *   Optional :
  *     ISOM_CODEC_TYPE_AVC1_VIDEO
@@ -3062,6 +3196,30 @@ typedef struct
     uint32_t maxBitrate;    /* the maximum rate in bits/second over any window of one second */
     uint32_t avgBitrate;    /* the average rate in bits/second over the entire presentation */
 } lsmash_h264_bitrate_t;
+
+typedef struct {
+    uint8_t dv_version_major;
+    uint8_t dv_version_minor;
+    uint8_t dv_profile;
+    uint8_t dv_level;
+    int rpu_present_flag;
+    int el_present_flag;
+    int bl_present_flag;
+    uint8_t dv_bl_signal_compatibility_id;
+    uint32_t reserved1;
+    uint32_t reserved2[4];
+} lsmash_hevc_dovi_t;
+
+void lsmash_dovi_set_config
+(
+    lsmash_hevc_dovi_t *data,
+    uint8_t dv_profile,
+    uint8_t dv_bl_signal_compatibility_id,
+    uint32_t timescale,
+    uint32_t timebase,
+    uint32_t width,
+    uint32_t height
+);
 
 /* Appendability of NAL unit into Decoder Configuration Record */
 typedef enum
@@ -3302,6 +3460,22 @@ int lsmash_get_hevc_array_completeness
     int                               *array_completeness
 );
 
+/* Supported SEIs stored in hvcC */
+typedef enum
+{
+    HEVC_SEI_MASTERING_DISPLAY = 137,
+} lsmash_hevc_sei_payload_type;
+
+/* Check if a given SEIs is stored in hvcC samples.
+ * Return 0 if payload_type is found.
+ * Return a negative value otherwise. */
+int lsmash_get_hevc_array_sei_presence
+(
+    lsmash_hevc_specific_parameters_t *param,
+    lsmash_hevc_dcr_nalu_type          ps_type,
+    lsmash_hevc_sei_payload_type       payload_type
+);
+
 uint8_t *lsmash_create_hevc_specific_info
 (
     lsmash_hevc_specific_parameters_t *param,
@@ -3368,6 +3542,58 @@ int lsmash_put_vc1_header
 uint8_t *lsmash_create_vc1_specific_info
 (
     lsmash_vc1_specific_parameters_t *param,
+    uint32_t                         *data_length
+);
+
+/* AV1 Specific Information
+ *   Mandatory :
+ *     ISOM_CODEC_TYPE_AV01_VIDEO
+ *
+ * For AV1 bitstream, ISOM_BRAND_TYPE_AV01 shall be present in compatible brands.
+ * For ISOM_CODEC_TYPE_AV01_VIDEO, a 'pasp' box shall be present. Users shall set par_h and par_v in lsmash_video_summary_t as follows.
+ *  par_h / par_v = MaxRenderWidth * (max_frame_height_minus_1 + 1) / ((max_frame_width_minus_1 + 1) * MaxRenderHeight) */
+
+typedef struct {
+    uint32_t sz;
+    uint8_t *data;
+} lsmash_av1_config_obus_t;
+
+/* chroma_sample_position */
+typedef enum
+{
+    LSMASH_AV1_CSP_UNKNOWN   = 0,   /* Unknown (in this case the source video transfer function must be signaled outside the AV1 bitstream) */
+    LSMASH_AV1_CSP_VERTICAL  = 1,   /* Horizontally co-located with (0, 0) luma sample, vertical position in the middle between two luma samples */
+    LSMASH_AV1_CSP_COLOCATED = 2,   /* co-located with (0, 0) luma sample */
+    LSMASH_AV1_CSP_RESERVED  = 3    /* reserved */
+} lsmash_av1_chroma_sample_position;
+
+typedef struct
+{
+    uint8_t seq_profile;                            /* the seq_profile value from the Sequence Header OBU */
+    uint8_t seq_level_idx_0;                        /* the value of seq_level_idx[0] in the Sequence Header OBU */
+    uint8_t seq_tier_0;                             /* the value of seq_tier[0] in the Sequence Header OBU */
+    uint8_t high_bitdepth;                          /* the high_bitdepth flag from the Sequence Header OBU */
+    uint8_t twelve_bit;                             /* the twelve_bit flag from the Sequence Header OBU */
+    uint8_t monochrome;                             /* the mono_chrome flag from the Sequence Header OBU */
+    uint8_t chroma_subsampling_x;                   /* the subsampling_x value from the Sequence Header OBU */
+    uint8_t chroma_subsampling_y;                   /* the subsampling_y value from the Sequence Header OBU */
+    lsmash_av1_chroma_sample_position chroma_sample_position;
+                                                    /* the chroma_sample_position value from the Sequence Header OBU */
+    uint8_t initial_presentation_delay_present;     /* This field indicates the presence of the initial_presentation_delay_minus_one field. */
+    uint8_t initial_presentation_delay_minus_one;   /* This field indicates the number of samples (minus one) that need to be decoded prior to starting the
+                                                     * presentation of the first sample associated with this sample entry in order to guarantee that each
+                                                     * sample will be decoded prior to its presentation time under the constraints of the first level value
+                                                     * indicated by seq_level_idx in the Sequence Header OBU (in the configOBUs field or in the associated
+                                                     * samples). */
+    lsmash_av1_config_obus_t configOBUs;            /* zero or more OBUs
+                                                     * This field SHALL contain at most one Sequence Header OBU and if present, it SHALL be the first OBU.
+                                                     * This field is expected to contain only one Sequence Header OBU and zero or more Metadata OBUs when
+                                                     * applicable to all the associated samples. */
+} lsmash_av1_specific_parameters_t;
+
+uint8_t *lsmash_create_av1_specific_info
+(
+    lsmash_av1_specific_parameters_t *param,
     uint32_t                         *data_length
 );
 

@@ -87,9 +87,23 @@ typedef struct
     int      disable;
     int      sbr;
     int      user_fps;
+    int      has_dv;
+    int      has_cd;
+    uint8_t  dv_profile;
+    uint8_t  dv_bl_signal_compatibility_id;
+    int      has_spatial_audio;
+    int      ambisonic_order;
+    int      has_stereo_mode;
+    char    *stereo_mode;
+    char    *projection;
+    int      has_ypr;
+    double   yaw;
+    double   pitch;
+    double   roll;
     uint32_t fps_num;
     uint32_t fps_den;
     uint32_t encoder_delay;
+    uint32_t constant_delay;
     int16_t  alternate_group;
     uint16_t ISO_language;
     uint16_t copyright_language;
@@ -136,6 +150,7 @@ typedef struct
     uint32_t          sample_entry;
     uint32_t          current_sample_number;
     uint32_t          ctd_shift;
+    uint32_t          cd_shift;
     uint32_t          priming_samples;
     uint32_t          last_delta;
     uint64_t          prev_dts;
@@ -267,11 +282,17 @@ static void display_help( void )
              "\n"
              "Track options:\n"
              "    disable                   Disable this track\n"
+             "    dv-profile=<arg>          Specify Dolby Vision profile\n"
+             "    ambisonic-order=<integer> Specify ambisonic order for a spatial audio track\n"
+             "    stereo-mode=<string>      Specify stereoscopic 3D mode on the video track\n"
+             "    projection=<string>       Specify projection mode for a spherical video\n"
+             "    ypr=<string>              Specify yaw/pitch/roll as float values separated by /\n"
              "    fps=<arg>                 Specify video framerate\n"
              "                                  <arg> is <integer> or <integer>/<integer>\n"
              "    language=<string>         Specify media language\n"
              "    alternate-group=<integer> Specify alternate group\n"
              "    encoder-delay=<integer>   Represent audio encoder delay (priming samples) explicitly\n"
+             "    constant-delay=<integer>  Force a constant composition time delay (in frames).\n"
              "    copyright=<arg>           Specify copyright notice with or without language (latter string)\n"
              "                                  <arg> is <string> or <string>/<string>\n"
              "    handler=<string>          Set media handler name\n"
@@ -657,10 +678,52 @@ static int parse_track_options( input_t *input )
                 char *track_parameter = strchr( track_option, '=' ) + 1;
                 track_opt->encoder_delay = atoi( track_parameter );
             }
+            else if ( strstr( track_option, "constant-delay=" ) )
+            {
+                char *track_parameter = strchr( track_option, '=' ) + 1;
+                track_opt->constant_delay = atoi( track_parameter );
+                track_opt->has_cd         = 1;
+            }
             else if( strstr( track_option, "language=" ) )
             {
                 char *track_parameter = strchr( track_option, '=' ) + 1;
                 track_opt->ISO_language = lsmash_pack_iso_language( track_parameter );
+            }
+            else if( strstr( track_option, "dv-profile=" ) )
+            {
+                char *track_parameter = strchr( track_option, '=' ) + 1;
+                if( sscanf( track_parameter, "%"SCNu8".%"SCNu8, &track_opt->dv_profile, &track_opt->dv_bl_signal_compatibility_id ) == 1 )
+                {
+                    track_opt->dv_profile = atoi( track_parameter );
+                    track_opt->dv_bl_signal_compatibility_id = 0;
+                }
+                track_opt->has_dv = 1;
+            }
+            else if( strstr( track_option, "ambisonic-order=" ) )
+            {
+                char *track_parameter = strchr( track_option, '=' ) + 1;
+                track_opt->ambisonic_order = atoi( track_parameter );
+                track_opt->has_spatial_audio = 1;
+            }
+            else if( strstr( track_option, "stereo-mode=" ) )
+            {
+                char *track_parameter = strchr( track_option, '=' ) + 1;
+                track_opt->stereo_mode = track_parameter;
+                track_opt->has_stereo_mode = 1;
+            }
+            else if( strstr( track_option, "projection=" ) )
+            {
+                char *track_parameter = strchr( track_option, '=' ) + 1;
+                track_opt->projection = track_parameter;
+            }
+            else if( strstr( track_option, "ypr=" ) )
+            {
+                char *track_parameter = strchr( track_option, '=' ) + 1;
+                if( sscanf( track_parameter, "%lf/%lf/%lf", &track_opt->yaw, &track_opt->pitch, &track_opt->roll ) != 3 )
+                {
+                    return ERROR_MSG( "incorrect number of elements for %s\n", track_option );
+                }
+                track_opt->has_ypr = 1;
             }
             else if( strstr( track_option, "fps=" ) )
             {
@@ -730,6 +793,7 @@ static void display_codec_name( lsmash_codec_type_t codec_type, uint32_t track_n
     DISPLAY_CODEC_NAME( ISOM_CODEC_TYPE_DTSX_AUDIO, DTS:X );
     DISPLAY_CODEC_NAME( ISOM_CODEC_TYPE_SAWB_AUDIO, Wideband AMR voice );
     DISPLAY_CODEC_NAME( ISOM_CODEC_TYPE_SAMR_AUDIO, Narrowband AMR voice );
+    DISPLAY_CODEC_NAME( ISOM_CODEC_TYPE_OPUS_AUDIO, Opus );
     DISPLAY_CODEC_NAME(   QT_CODEC_TYPE_LPCM_AUDIO, Uncompressed Audio );
 #undef DISPLAY_CODEC_NAME
 }
@@ -781,10 +845,19 @@ static int open_input_files( muxer_t *muxer )
                 if( opt->isom )
                     add_brand( opt, ISOM_BRAND_TYPE_AVC1 );
             }
+            else if( lsmash_check_codec_type_identical( codec_type, ISOM_CODEC_TYPE_AV01_VIDEO ) )
+            {
+                if( !opt->isom && opt->qtff )
+                    return ERROR_MSG( "the input seems AV1, at present available only for ISO Base Media file format.\n" );
+                if( opt->isom )
+                    add_brand( opt, ISOM_BRAND_TYPE_AV01 );
+            }
             else if( lsmash_check_codec_type_identical( codec_type, ISOM_CODEC_TYPE_HVC1_VIDEO ) )
             {
                 if( !opt->isom && opt->qtff )
                     return ERROR_MSG( "the input seems HEVC, at present available only for ISO Base Media file format.\n" );
+                if( in_track->opt.has_dv )
+                    add_brand( opt, ISOM_BRAND_TYPE_DBY1 );
             }
             else if( lsmash_check_codec_type_identical( codec_type, ISOM_CODEC_TYPE_VC_1_VIDEO ) )
             {
@@ -809,6 +882,13 @@ static int open_input_files( muxer_t *muxer )
             {
                 if( !opt->isom && opt->qtff )
                     return ERROR_MSG( "the input seems DTS(-HD) Audio, at present available only for ISO Base Media file format.\n" );
+            }
+            else if( lsmash_check_codec_type_identical( codec_type, ISOM_CODEC_TYPE_OPUS_AUDIO ) )
+            {
+                if( !opt->isom && opt->qtff )
+                    return ERROR_MSG( "the input seems Opus, at present available only for ISO Base Media file format.\n" );
+                if( opt->isom )
+                    add_brand( opt, ISOM_BRAND_TYPE_OPUS );
             }
             else if( lsmash_check_codec_type_identical( codec_type, ISOM_CODEC_TYPE_SAWB_AUDIO )
                   || lsmash_check_codec_type_identical( codec_type, ISOM_CODEC_TYPE_SAMR_AUDIO ) )
@@ -1002,6 +1082,84 @@ static int prepare_output( muxer_t *muxer )
                             timebase  = summary->timebase;
                         }
                     }
+                    if( track_opt->has_dv )
+                    {
+                        lsmash_codec_specific_t *dovi = lsmash_create_codec_specific_data( LSMASH_CODEC_SPECIFIC_DATA_TYPE_ISOM_VIDEO_HEVC_DOVI,
+                                                                                           LSMASH_CODEC_SPECIFIC_FORMAT_STRUCTURED );
+                        if( !dovi )
+                            return ERROR_MSG("Failed to allocate Dolby Vision configuration box.");
+                        lsmash_dovi_set_config(((lsmash_hevc_dovi_t*)dovi->data.structured), track_opt->dv_profile,
+                                               track_opt->dv_bl_signal_compatibility_id, timescale, timebase,
+                                               summary->width, summary->height);
+
+                        lsmash_add_codec_specific_data( in_track->summary, dovi );
+                        lsmash_destroy_codec_specific_data( dovi );
+                    }
+                    if( track_opt->has_stereo_mode )
+                    {
+                        lsmash_codec_specific_t *st3d = lsmash_create_codec_specific_data( LSMASH_CODEC_SPECIFIC_DATA_TYPE_ISOM_VIDEO_ST3D,
+                                                                                           LSMASH_CODEC_SPECIFIC_FORMAT_STRUCTURED );
+                        if( !st3d )
+                            return ERROR_MSG( "failed to allocate Stereoscopic 3D Video Box" );
+
+                        lsmash_st3d_t *data = (lsmash_st3d_t *)st3d->data.structured;
+                        if( !strcasecmp( track_opt->stereo_mode, "monoscopic" ))
+                            data->stereo_mode = 0;
+                        else if( !strcasecmp( track_opt->stereo_mode, "top-bottom" ))
+                            data->stereo_mode = 1;
+                        else if( !strcasecmp( track_opt->stereo_mode, "left-right" ))
+                            data->stereo_mode = 2;
+                        else if( !strcasecmp( track_opt->stereo_mode, "custom" ))
+                            data->stereo_mode = 3;
+                        else if( !strcasecmp( track_opt->stereo_mode, "right-left" ))
+                            data->stereo_mode = 4;
+
+
+                        lsmash_add_codec_specific_data( in_track->summary, st3d );
+                        lsmash_destroy_codec_specific_data( st3d );
+                    }
+                    if( track_opt->has_ypr )
+                    {
+                        lsmash_codec_specific_t *prhd = lsmash_create_codec_specific_data( LSMASH_CODEC_SPECIFIC_DATA_TYPE_ISOM_VIDEO_PRHD,
+                                                                                           LSMASH_CODEC_SPECIFIC_FORMAT_STRUCTURED );
+                        if( !prhd )
+                            return ERROR_MSG( "failed to allocate Projection Header" );
+
+                        lsmash_prhd_t *data = (lsmash_prhd_t *)prhd->data.structured;
+                        data->yaw   = (int32_t)( track_opt->yaw * (1 << 16) );
+                        data->pitch = (int32_t)( track_opt->pitch * (1 << 16) );
+                        data->roll  = (int32_t)( track_opt->roll * (1 << 16) );
+
+                        lsmash_add_codec_specific_data( in_track->summary, prhd );
+                        lsmash_destroy_codec_specific_data( prhd );
+                    }
+                    if( track_opt->projection )
+                    {
+                        if( strstr( track_opt->projection, "equirectangular" ) )
+                        {
+                            lsmash_codec_specific_t *equi = lsmash_create_codec_specific_data( LSMASH_CODEC_SPECIFIC_DATA_TYPE_ISOM_VIDEO_EQUI,
+                                                                                               LSMASH_CODEC_SPECIFIC_FORMAT_STRUCTURED );
+                            if( !equi )
+                                return ERROR_MSG( "failed to allocate the Projection Box" );
+
+                            lsmash_add_codec_specific_data( in_track->summary, equi );
+                            lsmash_destroy_codec_specific_data( equi );
+                        }
+                        else if( strstr( track_opt->projection, "cubemap" ) )
+                        {
+                            lsmash_codec_specific_t *cbmp = lsmash_create_codec_specific_data( LSMASH_CODEC_SPECIFIC_DATA_TYPE_ISOM_VIDEO_CBMP,
+                                                                                               LSMASH_CODEC_SPECIFIC_FORMAT_STRUCTURED );
+                            if( !cbmp )
+                                return ERROR_MSG( "failed to allocate the Projection Box" );
+
+                            lsmash_add_codec_specific_data( in_track->summary, cbmp );
+                            lsmash_destroy_codec_specific_data( cbmp );
+                        } else {
+                            return ERROR_MSG( "unsupported projection mode %s", track_opt->projection );
+                        }
+
+                    }
+
                     media_param.timescale          = timescale;
                     media_param.media_handler_name = track_opt->handler_name ? track_opt->handler_name : "L-SMASH Video Handler";
                     media_param.roll_grouping      = 1;
@@ -1024,6 +1182,35 @@ static int prepare_output( muxer_t *muxer )
                         summary->sbr_mode = MP4A_AAC_SBR_BACKWARD_COMPATIBLE;
                         if( lsmash_setup_AudioSpecificConfig( summary ) )
                             return ERROR_MSG( "failed to set SBR mode.\n" );
+                    }
+                    if( track_opt->has_spatial_audio )
+                    {
+                        if( track_opt->ambisonic_order < 0 )
+                            return ERROR_MSG( "ambisonic order must be a positive integer\n" );
+                        uint32_t ambisonic_channels = (track_opt->ambisonic_order + 1) * (track_opt->ambisonic_order + 1);
+                        if( ambisonic_channels != summary->channels )
+                            return ERROR_MSG( "ambisonic order's expected channel count does not match actual channel count\n" );
+
+                        lsmash_codec_specific_t *SA3D = lsmash_create_codec_specific_data( LSMASH_CODEC_SPECIFIC_DATA_TYPE_ISOM_AUDIO_SA3D,
+                                                                                           LSMASH_CODEC_SPECIFIC_FORMAT_STRUCTURED );
+                        if( !SA3D )
+                            return ERROR_MSG( "failed to allocate Spatial Audio Box" );
+
+                        lsmash_SA3D_t *data = (lsmash_SA3D_t *)SA3D->data.structured;
+                        data->version                    = 0;
+                        data->head_locked_stereo         = LSMASH_BOOLEAN_FALSE;
+                        data->ambisonic_type             = SA3D_AMBISONIC_TYPE_PERIPHONIC;
+                        data->ambisonic_order            = (uint32_t)track_opt->ambisonic_order;
+                        data->ambisonic_channel_ordering = SA3D_AMBISONIC_CHANNEL_ORDERING_ACN;
+                        data->ambisonic_normalization    = SA3D_AMBISONIC_NORMALIZATION_SN3D;
+                        data->num_channels               = ambisonic_channels;
+                        for( int i = 0; i < ambisonic_channels; i++ )
+                        {
+                            data->channel_map[i] = i;
+                        }
+
+                        lsmash_add_codec_specific_data( in_track->summary, SA3D );
+                        lsmash_destroy_codec_specific_data( SA3D );
                     }
                     media_param.timescale          = summary->frequency;
                     media_param.media_handler_name = track_opt->handler_name ? track_opt->handler_name : "L-SMASH Audio Handler";
@@ -1090,6 +1277,7 @@ static int do_mux( muxer_t *muxer )
     uint32_t num_active_input_tracks = out_movie->num_of_tracks;
     uint64_t total_media_size = 0;
     uint32_t progress_pos = 0;
+    int mux_ret = 0;
     while( 1 )
     {
         input_t *input = &muxer->input[current_input_number - 1];
@@ -1106,6 +1294,7 @@ static int do_mux( muxer_t *muxer )
                     return ERROR_MSG( "failed to alloc memory for buffer.\n" );
                 else if( ret <= -1 )
                 {
+                    mux_ret = LSMASH_ERR_INVALID_DATA;
                     lsmash_delete_sample( sample );
                     ERROR_MSG( "failed to get a frame from input file. Maybe corrupted.\n"
                                "Aborting muxing operation and trying to let output be valid file.\n" );
@@ -1138,10 +1327,7 @@ static int do_mux( muxer_t *muxer )
                     {
                         out_track->sample_entry = lsmash_add_sample_entry( output->root, out_track->track_ID, out_track->summary );
                         if( out_track->sample_entry == 0 )
-                        {
-                            ERROR_MSG( "failed to add sample description entry.\n" );
-                            break;
-                        }
+                            return ERROR_MSG( "failed to add sample description entry.\n" );
                     }
                 }
                 else if( ret == 2 ) /* EOF */
@@ -1152,7 +1338,10 @@ static int do_mux( muxer_t *muxer )
                     out_track->active = 0;
                     out_track->last_delta = lsmash_importer_get_last_delta( input->importer, input->current_track_number );
                     if( out_track->last_delta == 0 )
+                    {
+                        mux_ret = LSMASH_ERR_INVALID_DATA;
                         ERROR_MSG( "failed to get the last sample delta.\n" );
+                    }
                     out_track->last_delta *= out_track->timebase;
                     if( --num_active_input_tracks == 0 )
                         break;      /* Reached the end of whole tracks. */
@@ -1167,6 +1356,19 @@ static int do_mux( muxer_t *muxer )
                         if( out_track->current_sample_number == 0 )
                             out_track->ctd_shift = sample->cts;
                         sample->cts -= out_track->ctd_shift;
+                    }
+                    input_track_t *in_track = &input->track[input->current_track_number - 1];
+                    if( in_track->opt.has_cd ) {
+                        if( out_track->current_sample_number == 0 )
+                        {
+                            if( (in_track->opt.constant_delay * out_track->timebase) < sample->cts )
+                            {
+                                mux_ret = LSMASH_ERR_INVALID_DATA;
+                                ERROR_MSG( "constant delay must be greater than or equal to first CTS.\n" );
+                            }
+                            out_track->cd_shift = (in_track->opt.constant_delay * out_track->timebase) - sample->cts;
+                        }
+                        sample->cts += out_track->cd_shift;
                     }
                     out_track->dts = (double)sample->dts / out_track->timescale;
                     out_track->sample = sample;
@@ -1225,7 +1427,7 @@ static int do_mux( muxer_t *muxer )
         output_track_t *out_track = &out_movie->track[ out_movie->current_track_number - 1 ];
         uint32_t last_sample_delta = out_track->lpcm ? 1 : out_track->last_delta;
         if( lsmash_flush_pooled_samples( output->root, out_track->track_ID, last_sample_delta ) )
-            ERROR_MSG( "failed to flush the rest of samples.\n" );
+            return ERROR_MSG( "failed to flush the rest of samples.\n" );
         /* Create edit list.
          * Don't trust media duration basically. It's just duration of media, not duration of track presentation. */
         uint64_t actual_duration = out_track->lpcm
@@ -1236,10 +1438,12 @@ static int do_mux( muxer_t *muxer )
         edit.duration   = actual_duration * ((double)lsmash_get_movie_timescale( output->root ) / out_track->timescale);
         edit.start_time = out_track->priming_samples + out_track->start_offset;
         edit.rate       = ISOM_EDIT_MODE_NORMAL;
-        if( lsmash_create_explicit_timeline_map( output->root, out_track->track_ID, edit ) )
+        if( lsmash_create_explicit_timeline_map( output->root, out_track->track_ID, edit ) ) {
+            mux_ret = LSMASH_ERR_INVALID_DATA;
             ERROR_MSG( "failed to set timeline map.\n" );
+        }
     }
-    return 0;
+    return mux_ret;
 #undef LSMASH_MAX
 #undef LSMASH_MIN
 }
@@ -1278,6 +1482,7 @@ static int finish_movie( output_t *output, option_t *opt )
 
 int main( int argc, char *argv[] )
 {
+    int ret = 0;
     muxer_t muxer = { { 0 } };
     lsmash_get_mainargs( &argc, &argv );
     if( parse_global_options( argc, argv, &muxer ) )
@@ -1298,12 +1503,18 @@ int main( int argc, char *argv[] )
         return MUXER_ERR( "failed to open input files.\n" );
     if( prepare_output( &muxer ) )
         return MUXER_ERR( "failed to set up preparation for output.\n" );
-    if( do_mux( &muxer ) )
-        return MUXER_ERR( "failed to do muxing.\n" );
+    if( ( ret = do_mux( &muxer ) ) )
+    {
+        /* We wan't to finalize the movie if we only hit invalid input. */
+        if( ret == LSMASH_ERR_INVALID_DATA )
+            ret = -1;
+        else
+            return MUXER_ERR( "failed to do muxing.\n" );
+    }
     if( finish_movie( &muxer.output, &muxer.opt ) )
         return MUXER_ERR( "failed to finish movie.\n" );
     REFRESH_CONSOLE;
     eprintf( "Muxing completed!\n" );
     cleanup_muxer( &muxer );        /* including lsmash_destroy_root() */
-    return 0;
+    return ret;
 }
