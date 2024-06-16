@@ -34,6 +34,7 @@
 
 #include "codecs/mp4a.h"
 #include "codecs/mp4sys.h"
+#include "codecs/hevc.h"
 
 #include "importer/importer.h"
 
@@ -161,7 +162,7 @@ int isom_is_fullbox( const void *box )
 {
     const isom_box_t *current = (const isom_box_t *)box;
     lsmash_box_type_t type = current->type;
-    static lsmash_box_type_t fullbox_type_table[56] = { LSMASH_BOX_TYPE_INITIALIZER };
+    static lsmash_box_type_t fullbox_type_table[62] = { LSMASH_BOX_TYPE_INITIALIZER };
     if( !lsmash_check_box_type_specified( &fullbox_type_table[0] ) )
     {
         /* Initialize the table. */
@@ -219,7 +220,13 @@ int isom_is_fullbox( const void *box )
         fullbox_type_table[i++] = ISOM_BOX_TYPE_PRHD;
         fullbox_type_table[i++] = ISOM_BOX_TYPE_EQUI;
         fullbox_type_table[i++] = ISOM_BOX_TYPE_CBMP;
+        fullbox_type_table[i++] = ISOM_BOX_TYPE_PRJI;
         fullbox_type_table[i++] = ISOM_BOX_TYPE_EMSG;
+        fullbox_type_table[i++] = ISOM_BOX_TYPE_MUST;
+        fullbox_type_table[i++] = ISOM_BOX_TYPE_STRI;
+        fullbox_type_table[i++] = ISOM_BOX_TYPE_HERO;
+        fullbox_type_table[i++] = ISOM_BOX_TYPE_BLIN;
+        fullbox_type_table[i++] = ISOM_BOX_TYPE_DADJ;
         fullbox_type_table[i]   = LSMASH_BOX_TYPE_UNSPECIFIED;
     }
     for( int i = 0; lsmash_check_box_type_specified( &fullbox_type_table[i] ); i++ )
@@ -694,6 +701,13 @@ static void isom_remove_esds( isom_esds_t *esds )
     mp4sys_remove_descriptor( esds->ES );
 }
 
+static void isom_remove_lhvC( isom_lhvC_t *lhvC )
+{
+    if( LSMASH_IS_NON_EXISTING_BOX( lhvC ) )
+        return;
+    lhevc_free_arrays( lhvC->array, lhvC->numOfArrays );
+}
+
 DEFINE_SIMPLE_LIST_BOX_REMOVER( isom_remove_ftab, ftab )
 
 DEFINE_SIMPLE_BOX_REMOVER( isom_remove_frma, frma )
@@ -704,6 +718,11 @@ DEFINE_SIMPLE_BOX_REMOVER( isom_remove_terminator, terminator )
 static void isom_remove_chan( isom_chan_t *chan )
 {
     lsmash_free( chan->channelDescriptions );
+}
+
+static void isom_remove_must( isom_must_t *must )
+{
+    lsmash_free( must->required_box_types );
 }
 
 DEFINE_SIMPLE_BOX_REMOVER( isom_remove_stsd, stsd )
@@ -1510,6 +1529,7 @@ DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_sgbt, sgbt, visual,   QT_BOX_TYPE
 DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_stsl, stsl, visual, ISOM_BOX_TYPE_STSL, LSMASH_BOX_PRECEDENCE_ISOM_STSL, 0, isom_visual_entry_t )
 DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_btrt, btrt, visual, ISOM_BOX_TYPE_BTRT, LSMASH_BOX_PRECEDENCE_ISOM_BTRT, 0, isom_visual_entry_t )
 DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_dovi, dovi, visual, ISOM_BOX_TYPE_DVVC, LSMASH_BOX_PRECEDENCE_ISOM_DOVI, 0, isom_visual_entry_t ) // DVVC is just a placeholder
+DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_lhvC, lhvC, visual, ISOM_BOX_TYPE_LHVC, LSMASH_BOX_PRECEDENCE_ISOM_LHVC, 1, isom_visual_entry_t )
 DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_st3d, st3d, visual, ISOM_BOX_TYPE_ST3D, LSMASH_BOX_PRECEDENCE_ISOM_ST3D, 0, isom_visual_entry_t )
 DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_sv3d, sv3d, visual, ISOM_BOX_TYPE_SV3D, LSMASH_BOX_PRECEDENCE_ISOM_SV3D, 0, isom_visual_entry_t )
 DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_svhd, svhd, sv3d,   ISOM_BOX_TYPE_SVHD, LSMASH_BOX_PRECEDENCE_ISOM_SVHD, 0, isom_sv3d_t )
@@ -1517,6 +1537,17 @@ DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_proj, proj, sv3d,   ISOM_BOX_TYPE
 DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_prhd, prhd, proj,   ISOM_BOX_TYPE_PRHD, LSMASH_BOX_PRECEDENCE_ISOM_PRHD, 0, isom_proj_t )
 DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_equi, equi, proj,   ISOM_BOX_TYPE_EQUI, LSMASH_BOX_PRECEDENCE_ISOM_EQUI, 0, isom_proj_t )
 DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_cbmp, cbmp, proj,   ISOM_BOX_TYPE_CBMP, LSMASH_BOX_PRECEDENCE_ISOM_CBMP, 0, isom_proj_t )
+DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_prji, prji, proj,   ISOM_BOX_TYPE_PRJI, LSMASH_BOX_PRECEDENCE_ISOM_PRJI, 0, isom_proj_t )
+DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_vexu, vexu, visual, ISOM_BOX_TYPE_VEXU, LSMASH_BOX_PRECEDENCE_ISOM_VEXU, 0, isom_visual_entry_t )
+DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_eyes, eyes, vexu,   ISOM_BOX_TYPE_EYES, LSMASH_BOX_PRECEDENCE_ISOM_EYES, 0, isom_vexu_t )
+DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_must, must, eyes,   ISOM_BOX_TYPE_MUST, LSMASH_BOX_PRECEDENCE_ISOM_MUST, 1, isom_eyes_t )
+DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_stri, stri, eyes,   ISOM_BOX_TYPE_STRI, LSMASH_BOX_PRECEDENCE_ISOM_STRI, 0, isom_eyes_t )
+DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_hero, hero, eyes,   ISOM_BOX_TYPE_HERO, LSMASH_BOX_PRECEDENCE_ISOM_HERO, 0, isom_eyes_t )
+DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_cams, cams, eyes,   ISOM_BOX_TYPE_CAMS, LSMASH_BOX_PRECEDENCE_ISOM_CAMS, 0, isom_eyes_t )
+DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_blin, blin, cams,   ISOM_BOX_TYPE_BLIN, LSMASH_BOX_PRECEDENCE_ISOM_BLIN, 0, isom_cams_t )
+DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_cmfy, cmfy, eyes,   ISOM_BOX_TYPE_CMFY, LSMASH_BOX_PRECEDENCE_ISOM_CMFY, 0, isom_eyes_t )
+DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_dadj, dadj, cmfy,   ISOM_BOX_TYPE_DADJ, LSMASH_BOX_PRECEDENCE_ISOM_DADJ, 0, isom_cmfy_t )
+DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_hfov, hfov, visual, ISOM_BOX_TYPE_HFOV, LSMASH_BOX_PRECEDENCE_ISOM_HFOV, 0, isom_visual_entry_t )
 DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_wave, wave, audio,    QT_BOX_TYPE_WAVE, LSMASH_BOX_PRECEDENCE_QTFF_WAVE, 0, isom_audio_entry_t )
 DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_chan, chan, audio,    QT_BOX_TYPE_CHAN, LSMASH_BOX_PRECEDENCE_QTFF_CHAN, 1, isom_audio_entry_t )
 DEFINE_SIMPLE_SAMPLE_EXTENSION_ADDER( isom_add_srat, srat, audio,  ISOM_BOX_TYPE_SRAT, LSMASH_BOX_PRECEDENCE_ISOM_SRAT, 0, isom_audio_entry_t )

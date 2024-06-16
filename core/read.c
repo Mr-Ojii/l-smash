@@ -1013,6 +1013,138 @@ static int isom_read_cbmp( lsmash_file_t *file, isom_box_t *box, isom_box_t *par
     return isom_read_leaf_box_common_last_process( file, box, level, cbmp );
 }
 
+static int isom_read_prji( lsmash_file_t *file, isom_box_t *box, isom_box_t *parent, int level )
+{
+    ADD_BOX( prji, isom_proj_t );
+    isom_box_common_copy( prji, box );
+
+    lsmash_bs_t *bs = file->bs;
+    prji->projection_type = lsmash_bs_get_be32( bs );
+
+    return isom_read_leaf_box_common_last_process( file, box, level, prji );
+}
+
+static int isom_read_vexu( lsmash_file_t *file, isom_box_t *box, isom_box_t *parent, int level )
+{
+    ADD_BOX( vexu, isom_visual_entry_t );
+    isom_box_common_copy( vexu, box );
+    int ret = isom_add_print_func( file, vexu, level );
+    if( ret < 0 )
+        return ret;
+    return isom_read_children( file, box, vexu, level );
+}
+
+static int isom_read_eyes( lsmash_file_t *file, isom_box_t *box, isom_box_t *parent, int level )
+{
+    ADD_BOX( eyes, isom_vexu_t );
+    isom_box_common_copy( eyes, box );
+    int ret = isom_add_print_func( file, eyes, level );
+    if( ret < 0 )
+        return ret;
+    return isom_read_children( file, box, eyes, level );
+}
+
+static int isom_read_must( lsmash_file_t *file, isom_box_t *box, isom_box_t *parent, int level )
+{
+    ADD_BOX( must, isom_eyes_t );
+    isom_box_common_copy( must, box );
+
+    lsmash_bs_t *bs = file->bs;
+    uint64_t pos = lsmash_bs_count( bs );
+    uint64_t left = box->size - pos;
+    if( left % 4 != 0 )
+        return LSMASH_ERR_INVALID_DATA;
+    uint64_t num = left / 4;
+    must->required_box_types = lsmash_malloc( num + 1 );
+    if( !must->required_box_types )
+        return LSMASH_ERR_MEMORY_ALLOC;
+    for( uint64_t i = 0; i < num; i++)
+        must->required_box_types[i] = lsmash_bs_get_be32( bs );
+    must->required_box_types[num] = 0;
+
+    return isom_read_leaf_box_common_last_process( file, box, level, must );
+}
+
+static int isom_read_stri( lsmash_file_t *file, isom_box_t *box, isom_box_t *parent, int level )
+{
+    ADD_BOX( stri, isom_eyes_t );
+    isom_box_common_copy( stri, box );
+
+    lsmash_bs_t *bs = file->bs;
+    uint8_t tmp = lsmash_bs_get_byte( bs );
+    stri->reserved = (tmp & 0xF0) >> 8;
+    stri->eye_views_reversed = (tmp & 0x8) >> 3;
+    stri->has_additional_views = (tmp & 0x4) >> 2;
+    stri->has_right_eye_view = (tmp & 0x2) >> 1;
+    stri->has_left_eye_view = tmp & 0x1;
+
+    return isom_read_leaf_box_common_last_process( file, box, level, stri );
+}
+
+static int isom_read_hero( lsmash_file_t *file, isom_box_t *box, isom_box_t *parent, int level )
+{
+    ADD_BOX( hero, isom_eyes_t );
+    isom_box_common_copy( hero, box );
+
+    lsmash_bs_t *bs = file->bs;
+    hero->hero_eye_indicator = lsmash_bs_get_byte( bs );
+
+    return isom_read_leaf_box_common_last_process( file, box, level, hero );
+}
+
+static int isom_read_cams( lsmash_file_t *file, isom_box_t *box, isom_box_t *parent, int level )
+{
+    ADD_BOX( cams, isom_eyes_t );
+    isom_box_common_copy( cams, box );
+    int ret = isom_add_print_func( file, cams, level );
+    if( ret < 0 )
+        return ret;
+    return isom_read_children( file, box, cams, level );
+}
+
+static int isom_read_blin( lsmash_file_t *file, isom_box_t *box, isom_box_t *parent, int level )
+{
+    ADD_BOX( blin, isom_cams_t );
+    isom_box_common_copy( blin, box );
+
+    lsmash_bs_t *bs = file->bs;
+    blin->micrometers = lsmash_bs_get_be32( bs );
+
+    return isom_read_leaf_box_common_last_process( file, box, level, blin );
+}
+
+static int isom_read_cmfy( lsmash_file_t *file, isom_box_t *box, isom_box_t *parent, int level )
+{
+    ADD_BOX( cmfy, isom_eyes_t );
+    isom_box_common_copy( cmfy, box );
+    int ret = isom_add_print_func( file, cmfy, level );
+    if( ret < 0 )
+        return ret;
+    return isom_read_children( file, box, cmfy, level );
+}
+
+static int isom_read_dadj( lsmash_file_t *file, isom_box_t *box, isom_box_t *parent, int level )
+{
+    ADD_BOX( dadj, isom_cmfy_t );
+    isom_box_common_copy( dadj, box );
+
+    lsmash_bs_t *bs = file->bs;
+    dadj->adjustment = lsmash_bs_get_be32( bs );
+
+    return isom_read_leaf_box_common_last_process( file, box, level, dadj );
+}
+
+static int isom_read_hfov( lsmash_file_t *file, isom_box_t *box, isom_box_t *parent, int level )
+{
+    ADD_BOX( hfov, isom_visual_entry_t );
+    isom_box_common_copy( hfov, box );
+
+    lsmash_bs_t *bs = file->bs;
+    hfov->millidegrees = lsmash_bs_get_be32( bs );
+
+    return isom_read_leaf_box_common_last_process( file, box, level, hfov );
+}
+
 static int isom_read_stsd( lsmash_file_t *file, isom_box_t *box, isom_box_t *parent, int level )
 {
     if( !lsmash_check_box_type_identical( parent->type, ISOM_BOX_TYPE_STBL )
@@ -1232,6 +1364,44 @@ static int isom_read_dovi( lsmash_file_t *file, isom_box_t *box, isom_box_t *par
     dovi->reserved2[3] = lsmash_bs_get_be32( bs );
 
     return isom_read_leaf_box_common_last_process( file, box, level, dovi );
+}
+
+static int isom_read_lhvC( lsmash_file_t *file, isom_box_t *box, isom_box_t *parent, int level )
+{
+    ADD_BOX( lhvC, isom_visual_entry_t );
+    lsmash_bs_t *bs = file->bs;
+
+    lhvC->configurationVersion = lsmash_bs_get_byte( bs );
+    uint16_t tmp16 = lsmash_bs_get_be16( bs );
+    lhvC->min_spatial_segmentation_idc = tmp16 & 0xFFF;
+    uint8_t tmp8 = lsmash_bs_get_byte( bs );
+    lhvC->parallelismType = tmp8 & 0x3;
+    tmp8 = lsmash_bs_get_byte( bs );
+    lhvC->numTemporalLayers = (tmp8 & 0x38) >> 3;
+    lhvC->temporalIdNested = (tmp8 & 0x4) >> 2;
+    lhvC->lengthSizeMinusOne = tmp8 & 0x3;
+    lhvC->numOfArrays = lsmash_bs_get_byte( bs );
+    lhvC->array = lsmash_malloc( lhvC->numOfArrays * sizeof(lsmash_lhevc_paramater_arrays_t) );
+    if( !lhvC->array )
+        return LSMASH_ERR_MEMORY_ALLOC;
+    for( uint8_t i = 0; i < lhvC->numOfArrays; i++ )
+    {
+        tmp8 = lsmash_bs_get_byte( bs );
+        lhvC->array[i].array_completeness = (tmp8 & 0x80) >> 7;
+        lhvC->array[i].NAL_unit_type = tmp8 & 0x3F;
+        lhvC->array[i].numNalus = lsmash_bs_get_be16( bs );
+        lhvC->array[i].nalUnit = lsmash_malloc( lhvC->array[i].numNalus * sizeof(lsmash_lhevc_nal_t));
+        if( !lhvC->array[i].nalUnit )
+            return LSMASH_ERR_MEMORY_ALLOC;
+        for( uint16_t j = 0; j < lhvC->array[i].numNalus; j++ ) {
+            lhvC->array[i].nalUnit[j].nalUnitLength = lsmash_bs_get_be16( bs );
+            lhvC->array[i].nalUnit[j].nalUnit = lsmash_bs_get_bytes( bs, lhvC->array[i].nalUnit[j].nalUnitLength );
+            if( !lhvC->array[i].nalUnit[j].nalUnit )
+                return LSMASH_ERR_MEMORY_ALLOC;
+        }
+    }
+
+    return isom_read_leaf_box_common_last_process( file, box, level, lhvC );
 }
 
 static int isom_read_glbl( lsmash_file_t *file, isom_box_t *box, isom_box_t *parent, int level )
@@ -2982,7 +3152,7 @@ int isom_read_box( lsmash_file_t *file, isom_box_t *box, isom_box_t *parent, uin
         lsmash_compact_box_type_t fourcc;
         lsmash_box_type_t (*form_box_type_func)( lsmash_compact_box_type_t );
         int (*reader_func)( lsmash_file_t *, isom_box_t *, isom_box_t *, int );
-    } box_reader_table[128] = { { 0, NULL, NULL } };
+    } box_reader_table[132] = { { 0, NULL, NULL } };
     if( !box_reader_table[0].reader_func )
     {
         /* Initialize the table. */
@@ -3018,6 +3188,15 @@ int isom_read_box( lsmash_file_t *file, isom_box_t *box, isom_box_t *parent, uin
         ADD_BOX_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_PRHD, lsmash_form_iso_box_type,  isom_read_prhd );
         ADD_BOX_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_EQUI, lsmash_form_iso_box_type,  isom_read_equi );
         ADD_BOX_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_CBMP, lsmash_form_iso_box_type,  isom_read_cbmp );
+        ADD_BOX_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_PRJI, lsmash_form_iso_box_type,  isom_read_prji );
+        ADD_BOX_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_EYES, lsmash_form_iso_box_type,  isom_read_eyes );
+        ADD_BOX_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_MUST, lsmash_form_iso_box_type,  isom_read_must );
+        ADD_BOX_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_STRI, lsmash_form_iso_box_type,  isom_read_stri );
+        ADD_BOX_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_HERO, lsmash_form_iso_box_type,  isom_read_hero );
+        ADD_BOX_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_CAMS, lsmash_form_iso_box_type,  isom_read_cams );
+        ADD_BOX_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_BLIN, lsmash_form_iso_box_type,  isom_read_blin );
+        ADD_BOX_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_CMFY, lsmash_form_iso_box_type,  isom_read_cmfy );
+        ADD_BOX_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_DADJ, lsmash_form_iso_box_type,  isom_read_dadj );
         ADD_BOX_READER_TABLE_ELEMENT(   QT_BOX_TYPE_GMHD, lsmash_form_qtff_box_type, isom_read_gmhd );
         ADD_BOX_READER_TABLE_ELEMENT(   QT_BOX_TYPE_GMIN, lsmash_form_qtff_box_type, isom_read_gmin );
         ADD_BOX_READER_TABLE_ELEMENT(   QT_BOX_TYPE_TEXT, lsmash_form_qtff_box_type, isom_read_text );
@@ -3131,7 +3310,7 @@ int isom_read_box( lsmash_file_t *file, isom_box_t *box, isom_box_t *parent, uin
             lsmash_compact_box_type_t fourcc;
             lsmash_box_type_t (*form_box_type_func)( lsmash_compact_box_type_t );
             int (*reader_func)( lsmash_file_t *, isom_box_t *, isom_box_t *, int );
-        } extension_reader_table[64] = { { 0, NULL, NULL } };
+        } extension_reader_table[67] = { { 0, NULL, NULL } };
         if( !extension_reader_table[0].reader_func )
         {
             /* Initialize the table. */
@@ -3155,6 +3334,7 @@ int isom_read_box( lsmash_file_t *file, isom_box_t *box, isom_box_t *parent, uin
             ADD_EXTENSION_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_AVCC, lsmash_form_iso_box_type,  isom_read_codec_specific );
             ADD_EXTENSION_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_DVCC, lsmash_form_iso_box_type,  isom_read_dovi );
             ADD_EXTENSION_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_DVVC, lsmash_form_iso_box_type,  isom_read_dovi );
+            ADD_EXTENSION_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_LHVC, lsmash_form_iso_box_type,  isom_read_lhvC );
             ADD_EXTENSION_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_BTRT, lsmash_form_iso_box_type,  isom_read_btrt );
             ADD_EXTENSION_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_COLR, lsmash_form_iso_box_type,  isom_read_colr );
             ADD_EXTENSION_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_CLAP, lsmash_form_iso_box_type,  isom_read_clap );
@@ -3162,6 +3342,7 @@ int isom_read_box( lsmash_file_t *file, isom_box_t *box, isom_box_t *parent, uin
             ADD_EXTENSION_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_HVCC, lsmash_form_iso_box_type,  isom_read_codec_specific );
             ADD_EXTENSION_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_DVCC, lsmash_form_iso_box_type,  isom_read_codec_specific );
             ADD_EXTENSION_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_DVVC, lsmash_form_iso_box_type,  isom_read_codec_specific );
+            ADD_EXTENSION_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_LHVC, lsmash_form_iso_box_type,  isom_read_codec_specific );
             ADD_EXTENSION_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_PASP, lsmash_form_iso_box_type,  isom_read_pasp );
             ADD_EXTENSION_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_STSL, lsmash_form_iso_box_type,  isom_read_stsl );
             ADD_EXTENSION_READER_TABLE_ELEMENT(   QT_BOX_TYPE_CLLI, lsmash_form_qtff_box_type, isom_read_clli );
@@ -3173,6 +3354,8 @@ int isom_read_box( lsmash_file_t *file, isom_box_t *box, isom_box_t *parent, uin
             ADD_EXTENSION_READER_TABLE_ELEMENT(   QT_BOX_TYPE_SGBT, lsmash_form_qtff_box_type, isom_read_sgbt );
             ADD_EXTENSION_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_ST3D, lsmash_form_iso_box_type,  isom_read_st3d );
             ADD_EXTENSION_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_SV3D, lsmash_form_iso_box_type,  isom_read_sv3d );
+            ADD_EXTENSION_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_VEXU, lsmash_form_iso_box_type,  isom_read_vexu );
+            ADD_EXTENSION_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_HFOV, lsmash_form_iso_box_type,  isom_read_hfov );
             /* Others */
             ADD_EXTENSION_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_ESDS, lsmash_form_iso_box_type,  isom_read_esds );
             ADD_EXTENSION_READER_TABLE_ELEMENT( ISOM_BOX_TYPE_FTAB, lsmash_form_iso_box_type,  isom_read_ftab );
