@@ -150,6 +150,15 @@
     <ClCompile Include="core\box_type.c">
       <Filter>Sources</Filter>
     </ClCompile>
+    <ClCompile Include="codecs\av1.c">
+      <Filter>Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="codecs\av1_obu.c">
+      <Filter>Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="importer\ivf_imp.c">
+      <Filter>Sources</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="codecs\a52.h">
@@ -231,6 +240,12 @@
       <Filter>Headers</Filter>
     </ClInclude>
     <ClInclude Include="core\write.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="codecs\av1_obu.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="codecs\av1.h">
       <Filter>Headers</Filter>
     </ClInclude>
   </ItemGroup>

@@ -151,6 +151,8 @@
   <ItemGroup>
     <ClCompile Include="codecs\a52.c" />
     <ClCompile Include="codecs\alac.c" />
+    <ClCompile Include="codecs\av1.c" />
+    <ClCompile Include="codecs\av1_obu.c" />
     <ClCompile Include="codecs\description.c" />
     <ClCompile Include="codecs\dts.c" />
     <ClCompile Include="codecs\h264.c" />
@@ -191,6 +193,7 @@
     <ClCompile Include="importer\dts_imp.c" />
     <ClCompile Include="importer\importer.c" />
     <ClCompile Include="importer\isobm_imp.c" />
+    <ClCompile Include="importer\ivf_imp.c" />
     <ClCompile Include="importer\mp3_imp.c" />
     <ClCompile Include="importer\nalu_imp.c" />
     <ClCompile Include="importer\vc1_imp.c" />
@@ -198,6 +201,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="codecs\a52.h" />
+    <ClInclude Include="codecs\av1.h" />
+    <ClInclude Include="codecs\av1_obu.h" />
     <ClInclude Include="codecs\description.h" />
     <ClInclude Include="codecs\dts.h" />
     <ClInclude Include="codecs\h264.h" />
