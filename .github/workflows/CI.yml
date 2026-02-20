@@ -8,13 +8,13 @@ on:
 
 
 jobs:
-  win-build:
+  win-make-build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         config: 
-          - { cpu: i686, arch: x86 }
-          - { cpu: x86_64, arch: x64 }
+          - { cpu: i686 }
+          - { cpu: x86_64 }
     steps:
     - name: Checkout repository
       uses: actions/checkout@v6
@@ -33,7 +33,7 @@ jobs:
     - name: Build
       run: |
         cd ${{ github.workspace }}
-        ./configure --cross-prefix=${{ matrix.config.cpu }}-w64-mingw32- --extra-cflags=-I../obuparse --extra-ldflags=-L../obuparse
+        ./configure --cross-prefix=${{ matrix.config.cpu }}-w64-mingw32- --extra-cflags=-I./obuparse --extra-ldflags=-L./obuparse
         make -j$(nproc)
 
 
@@ -66,5 +66,5 @@ jobs:
     - name: Build
       run: |
         cd ${{ github.workspace }}
-        ./configure --extra-cflags="-I../obuparse ${{ matrix.config.option }}" --extra-ldflags=-L../obuparse
+        ./configure --extra-cflags="-I./obuparse ${{ matrix.config.option }}" --extra-ldflags=-L./obuparse
         make -j$(${{ matrix.config.opt_com }})
