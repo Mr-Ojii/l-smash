@@ -50,3 +50,4 @@ Release/
 CLIRelease/
 *.sdf
 *.opensdf
+.vs/
