@@ -10,12 +10,17 @@ on:
 jobs:
   win-msvc-build:
     runs-on: windows-latest
+    strategy:
+      matrix:
+        config: 
+          - { arch: x86, msvc_arch: Win32 }
+          - { arch: x64, msvc_arch: x64 }
     steps:
     - name: Checkout repository
       uses: actions/checkout@v6
     - uses: ilammy/msvc-dev-cmd@v1
       with:
-        arch: x86
+        arch: ${{ matrix.config.arch }}
     - name: Build obuparse
       run: |
         cd ${{ github.workspace }}
@@ -29,8 +34,8 @@ jobs:
     - name: Build
       run: |
         cd ${{ github.workspace }}
-        msbuild l-smash.sln /p:Configuration=Debug /p:Platform=Win32
-        msbuild l-smash.sln /p:Configuration=Release /p:Platform=Win32
+        msbuild l-smash.sln /p:Configuration=Debug /p:Platform=${{ matrix.config.msvc_arch }}
+        msbuild l-smash.sln /p:Configuration=Release /p:Platform=${{ matrix.config.msvc_arch }}
 
 
   win-make-build:
