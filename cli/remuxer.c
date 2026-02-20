@@ -1159,7 +1159,7 @@ static int set_starting_point( input_t *input, input_track_t *in_track, uint32_t
     if( lsmash_get_cts_from_media_timeline( input->root, in_track->track_ID, rap_number, &rap_cts ) )
         return ERROR_MSG( "failed to get CTS of the first random accessible sample of seek point.\n" );
     if( lsmash_get_composition_to_decode_shift_from_media_timeline( input->root, in_track->track_ID, &ctd_shift ) )
-        return ERROR_MSG( "failed to get composition to decode timeline shfit.\n" );
+        return ERROR_MSG( "failed to get composition to decode timeline shift.\n" );
     in_track->composition_delay = rap_cts - rap_dts + ctd_shift;
     /* Check if starting point is random accessible. */
     if( lsmash_get_closest_random_accessible_point_from_media_timeline( input->root, in_track->track_ID, seek_point, &rap_number ) )
