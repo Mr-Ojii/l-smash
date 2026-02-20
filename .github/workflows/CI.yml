@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+
+jobs:
+  win-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        config: 
+          - { cpu: i686, arch: x86 }
+          - { cpu: x86_64, arch: x64 }
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+
+    - name: Install mingw-w64
+      run: sudo apt install mingw-w64
+
+    - name: Build obuparse
+      run: |
+        cd ${{ github.workspace }}
+        git clone https://github.com/dwbuiten/obuparse.git
+        cd obuparse
+        ${{ matrix.config.cpu }}-w64-mingw32-gcc -c obuparse.c
+        ${{ matrix.config.cpu }}-w64-mingw32-ar r obuparse.lib obuparse.o
+
+    - name: Build
+      run: |
+        cd ${{ github.workspace }}
+        ./configure --cross-prefix=${{ matrix.config.cpu }}-w64-mingw32- --extra-cflags=-I../obuparse --extra-ldflags=-L../obuparse
+        make -j$(nproc)
+
+
+  make-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        config: 
+          - { runner: ubuntu-latest, option: "-m32", opt_com: "nproc" }
+          - { runner: ubuntu-latest, option: "-m64", opt_com: "nproc" }
+          - { runner: macos-latest, option: "", opt_com: "sysctl -n hw.ncpu" }
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+
+    - name: Install multilib
+      if: ${{ startsWith(matrix.config.runner, 'ubuntu-latest') }}
+      run: |
+        sudo apt update
+        sudo apt install gcc-multilib
+
+    - name: Build obuparse
+      run: |
+        cd ${{ github.workspace }}
+        git clone https://github.com/dwbuiten/obuparse.git
+        cd obuparse
+        gcc -c obuparse.c ${{ matrix.config.option }}
+        ar r libobuparse.a obuparse.o
+
+    - name: Build
+      run: |
+        cd ${{ github.workspace }}
+        ./configure --extra-cflags="-I../obuparse ${{ matrix.config.option }}" --extra-ldflags=-L../obuparse
+        make -j$(${{ matrix.config.opt_com }})
