@@ -8,6 +8,31 @@ on:
 
 
 jobs:
+  win-msvc-build:
+    runs-on: windows-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+    - uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x86
+    - name: Build obuparse
+      run: |
+        cd ${{ github.workspace }}
+        git clone https://github.com/dwbuiten/obuparse.git
+        cd obuparse
+        cl /c obuparse.c
+        lib obuparse.obj /OUT:obuparse.lib
+        move obuparse.h ..
+        move obuparse.lib ..
+
+    - name: Build
+      run: |
+        cd ${{ github.workspace }}
+        msbuild l-smash.sln /p:Configuration=Debug /p:Platform=Win32
+        msbuild l-smash.sln /p:Configuration=Release /p:Platform=Win32
+
+
   win-make-build:
     runs-on: ubuntu-latest
     strategy:
